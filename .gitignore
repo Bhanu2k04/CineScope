@@ -1,0 +1,13 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+.env
+
+# Node
+node_modules/
+build/
+
+# Large ML files - these get uploaded separately
+backend/ml_models/*.npy
+backend/ml_models/*.pkl
