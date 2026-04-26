@@ -12,6 +12,7 @@ import PersonDetails from "./pages/PersonDetails";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ProfileSelector from "./pages/ProfileSelector";
+import LandingPage from "./pages/LandingPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import InfoModal from "./components/Info";
 import Chatbot from "./components/Chatbot";
@@ -20,8 +21,13 @@ import { jwtDecode } from "jwt-decode";
 import { Toaster } from "react-hot-toast";
 import { UserProvider } from "./context/UserContext";
 
+// Show landing page only once per session
+const hasSeenLanding = () => sessionStorage.getItem("cs_landing_seen") === "true";
+const markLandingSeen = () => sessionStorage.setItem("cs_landing_seen", "true");
+
 function App() {
-  const [showSplash, setShowSplash] = useState(true);
+  const [showLanding, setShowLanding] = useState(!hasSeenLanding());
+  const [showSplash, setShowSplash] = useState(false);
   const [authState, setAuthState] = useState({
     isAuthenticated: false,
     isLoading: true,
@@ -37,12 +43,13 @@ function App() {
 
   const setInfoOpen = (open) =>
     setAuthState(prev => ({ ...prev, isInfoOpen: open }));
-
   const setSidebarOpen = (open) =>
     setAuthState(prev => ({ ...prev, isSidebarOpen: open }));
 
   const handleLogout = () => {
     localStorage.removeItem("token");
+    // Show landing again on logout
+    markLandingSeen(); // keep it seen so no splash again
     setAuthState({
       isAuthenticated: false,
       isLoading: false,
@@ -102,7 +109,7 @@ function App() {
         return;
       }
       try {
-        jwtDecode(token); // validate structure
+        jwtDecode(token);
         const response = await fetch("http://localhost:5000/user/profile", {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -133,7 +140,7 @@ function App() {
     setAuthState(prev => {
       const idx = prev.profiles.findIndex(
         p => p.name === prev.selectedProfile?.name &&
-             p.profile_emoji === prev.selectedProfile?.profile_emoji
+          p.profile_emoji === prev.selectedProfile?.profile_emoji
       );
       const newProfiles = [...prev.profiles];
       if (idx !== -1) newProfiles[idx] = { ...newProfiles[idx], ...updatedProfile };
@@ -145,7 +152,30 @@ function App() {
     });
   };
 
-  if (showSplash) return <SplashScreen onComplete={() => setShowSplash(false)} />;
+  // ── Landing page (first visit) ──────────────────────────────────────────
+  if (showLanding) {
+    return (
+      <LandingPage
+        onEnter={() => {
+          markLandingSeen();
+          setShowLanding(false);
+          // Show splash after landing
+          if (!authState.isAuthenticated) {
+            setShowSplash(true);
+          }
+        }}
+      />
+    );
+  }
+
+  // ── Splash screen ───────────────────────────────────────────────────────
+  if (showSplash) {
+    return (
+      <SplashScreen onComplete={() => setShowSplash(false)} />
+    );
+  }
+
+  // ── Loading ─────────────────────────────────────────────────────────────
   if (authState.isLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-900">
@@ -157,6 +187,7 @@ function App() {
   return (
     <UserProvider>
       <Toaster position="top-center" reverseOrder={false} />
+
       {!authState.isAuthenticated ? (
         <Routes>
           <Route path="/login" element={<Login onLogin={handleLogin} />} />
@@ -175,9 +206,7 @@ function App() {
             <Navbar setInfoOpen={setInfoOpen} user={isAdmin ? user : selectedProfile} />
             <Routes>
               <Route path="/" element={
-                <ProtectedRoute>
-                  <Home profile={isAdmin ? user : selectedProfile} />
-                </ProtectedRoute>
+                <ProtectedRoute><Home profile={isAdmin ? user : selectedProfile} /></ProtectedRoute>
               } />
               <Route path="/languages" element={<ProtectedRoute><Languages /></ProtectedRoute>} />
               <Route path="/genres" element={<ProtectedRoute><Genres /></ProtectedRoute>} />
@@ -196,7 +225,9 @@ function App() {
                   <MovieDetails profile={isAdmin ? user : selectedProfile} />
                 </ProtectedRoute>
               } />
-              <Route path="/person/:id" element={<ProtectedRoute><PersonDetails /></ProtectedRoute>} />
+              <Route path="/person/:id" element={
+                <ProtectedRoute><PersonDetails /></ProtectedRoute>
+              } />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
