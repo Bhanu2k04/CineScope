@@ -155,7 +155,7 @@ cinescope/
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/cinescope.git
+git clone https://github.com/Bhanu2k04/CineScope.git
 cd cinescope
 ```
 
